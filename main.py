@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 import telebot
 from flask import Flask
@@ -8,7 +9,10 @@ bot = telebot.TeleBot(TOKEN)
 CHANNEL_USERNAME = '@sevgi4500'
 
 app = Flask(__name__)
+
+# Kullanıcı verileri ve albüm/media grupları için depolama
 user_data = {}
+user_albums = {}
 
 @app.route('/')
 def home():
@@ -18,72 +22,126 @@ def home():
 def send_welcome(message):
     bot.reply_to(
         message, 
-        "Merhaba! Kanala kilitli (Paid Media) içerik yüklemek için bana bir Fotoğraf veya Video gönderin."
+        "Merhaba! Kanala kilitli (Paid Media) içerik yüklemek için bana Fotoğraf/Video veya Albüm gönderin."
     )
 
 @bot.message_handler(content_types=['photo', 'video'])
 def handle_media(message):
     chat_id = message.chat.id
     
+    # Medya türü ve ID tespiti
     if message.photo:
         file_id = message.photo[-1].file_id
         media_type = 'photo'
     else:
         file_id = message.video.file_id
         media_type = 'video'
-        
-    user_data[chat_id] = {
-        'file_id': file_id,
-        'type': media_type
-    }
-    
-    msg = bot.reply_to(
-        message, 
-        "İçerik alındı! 🌟 Bu gönderi kaç Telegram Yıldızı (Stars) karşılığında açılsın? (Örn: 100, 400, 1000)"
-    )
-    bot.register_next_step_handler(msg, process_star_amount)
 
-def process_star_amount(message):
+    caption = message.caption or ""
+
+    # Eğer toplu içerik (albüm) atılıyorsa
+    if message.media_group_id:
+        group_id = message.media_group_id
+        if group_id not in user_albums:
+            user_albums[group_id] = {
+                'chat_id': chat_id,
+                'items': [],
+                'caption': caption
+            }
+            # Albümdeki tüm fotoğrafların gelmesini kısa bir süre bekle
+            bot.send_message(
+                chat_id, 
+                "Toplu içerik algılandı! 🌟 Bu albümün tamamı kaç Telegram Yıldızı (Stars) olsun? (Örn: 100, 500)"
+            )
+            msg = bot.send_message(chat_id, "Lütfen fiyatı girin:")
+            bot.register_next_step_handler(msg, lambda m: process_album_star_amount(m, group_id))
+
+        user_albums[group_id]['items'].append({
+            'type': media_type,
+            'media': file_id
+        })
+        if caption and not user_albums[group_id]['caption']:
+            user_albums[group_id]['caption'] = caption
+
+    # Tekli içerik atılıyorsa
+    else:
+        user_data[chat_id] = {
+            'items': [{'type': media_type, 'media': file_id}],
+            'caption': caption
+        }
+        
+        msg = bot.reply_to(
+            message, 
+            "İçerik alındı! 🌟 Bu gönderi kaç Telegram Yıldızı (Stars) karşılığında açılsın? (Örn: 100, 400, 1000)"
+        )
+        bot.register_next_step_handler(msg, process_single_star_amount)
+
+def process_single_star_amount(message):
     chat_id = message.chat.id
     if chat_id not in user_data:
-        bot.send_message(chat_id, "Lütfen önce bir fotoğraf veya video gönderin.")
+        bot.send_message(chat_id, "Lütfen önce fotoğraf veya video gönderin.")
         return
         
     try:
         stars = int(message.text)
         data = user_data[chat_id]
-        
-        bot.send_message(
-            chat_id, 
-            f"✅ İşlem Başarılı!\n"
-            f"Tür: {data['type'].upper()}\n"
-            f"Fiyat: {stars} Stars\n\n"
-            f"İçerik {CHANNEL_USERNAME} kanalına kilitli olarak aktarılıyor..."
-        )
-        
-        # Telegram API'ye doğrudan istek atarak kesin kilitli (paid media) gönderiyoruz
-        url = f"https://api.telegram.org/bot{TOKEN}/sendPaidMedia"
-        
-        payload = {
-            "chat_id": CHANNEL_USERNAME,
-            "star_count": stars,
-            "media": [
-                {
-                    "type": data['type'],
-                    "media": data['file_id'],
-                    "caption": f"🔓 Bu içeriği açmak için {stars} Stars ödeyin."
-                }
-            ]
-        }
-        
-        response = requests.post(url, json=payload)
-        print("Telegram API Yanıtı:", response.text)
-            
+        send_to_telegram(chat_id, data['items'], stars, data['caption'])
         del user_data[chat_id]
         
     except ValueError:
         msg = bot.reply_to(message, "Lütfen sadece sayı yazın! (Örn: 100, 400 veya 1000)")
-        bot.register_next_step_handler(msg, process_star_amount)
+        bot.register_next_step_handler(msg, process_single_star_amount)
+
+def process_album_star_amount(message, group_id):
+    chat_id = message.chat.id
+    if group_id not in user_albums:
+        bot.send_message(chat_id, "Albüm oturumu bulunamadı. Lütfen tekrar atın.")
+        return
+
+    try:
+        stars = int(message.text)
+        data = user_albums[group_id]
+        send_to_telegram(chat_id, data['items'], stars, data['caption'])
+        del user_albums[group_id]
+
+    except ValueError:
+        msg = bot.reply_to(message, "Lütfen sadece sayı yazın! (Örn: 100, 400 veya 1000)")
+        bot.register_next_step_handler(msg, lambda m: process_album_star_amount(m, group_id))
+
+def send_to_telegram(chat_id, items, stars, caption):
+    bot.send_message(
+        chat_id, 
+        f"✅ İşlem Başarılı!\n"
+        f"Öğe Sayısı: {len(items)}\n"
+        f"Fiyat: {stars} Stars\n\n"
+        f"İçerik {CHANNEL_USERNAME} kanalına kilitli olarak aktarılıyor..."
+    )
+
+    # Medya listesini oluştur
+    media_payload = []
+    for idx, item in enumerate(items):
+        m_obj = {
+            "type": item['type'],
+            "media": item['media']
+        }
+        # Açıklamayı (caption) ilk medyanın içine ekliyoruz
+        if idx == 0 and caption:
+            m_obj["caption"] = caption
+        media_payload.append(m_obj)
+
+    url = f"https://api.telegram.org/bot{TOKEN}/sendPaidMedia"
+    
+    payload = {
+        "chat_id": CHANNEL_USERNAME,
+        "star_count": stars,
+        "media": media_payload
+    }
+    
+    if caption:
+        payload["caption"] = caption
+    
+    response = requests.post(url, json=payload)
+    print("Telegram API Yanıtı:", response.text)
 
 if __name__ == '__main__':
     import threading
