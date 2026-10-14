@@ -1,21 +1,30 @@
+import os
 import telebot
+from flask import Flask
 
-TOKEN = '8876167807:AAEHfJlHcdY4xWEL-kYTuVzvIm5n82AhHbU
+# Parantez yöntemiyle telefonda kayma/bölünme sorunu tamamen ortadan kalkar
+TOKEN = (
+    '8876167807:AAEHfJlHcdY4xWEL-'
+    'kYTuVzvIm5n82AhHbU'
+)
+
 bot = telebot.TeleBot(TOKEN)
 CHANNEL_USERNAME = '@sevgi4500'
 
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot aktif!"
+
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "Merhaba! Paid Media (100 Stars) botu aktif ve çalışıyor.")
-
-@bot.message_handler(commands=['paylas'])
-def send_paid_media_post(message):
-    try:
-        bot.send_message(message.chat.id, "Paid media içeriği @sevgi4500 kanalına gönderiliyor...")
-        bot.send_message(CHANNEL_USERNAME, "Bu mesaj 100 Stars (Paid Media) ile gönderilmiştir.")
-    except Exception as e:
-        bot.reply_to(message, f"Hata oluştu: {e}")
+    bot.reply_to(message, "Bot aktif!")
 
 if __name__ == '__main__':
-    print("Bot çalışıyor...")
-    bot.infinity_polling()
+    import threading
+    port = int(os.environ.get('PORT', 5000))
+    bot_thread = threading.Thread(target=bot.infinity_polling)
+    bot_thread.daemon = True
+    bot_thread.start()
+    app.run(host='0.0.0.0', port=port)
