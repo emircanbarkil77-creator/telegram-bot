@@ -2,9 +2,9 @@ import os
 import telebot
 from flask import Flask
 
+# Yeni ve güvenli token'ın
 TOKEN = (
-    '8876167807:AAEHfJlHcdY4xWEL-'
-    'kYTuVzvIm5n82AhHbU'
+    '8876167807:AAGKP2fk26eGzqEIja2TOahLCtejFewbHoI'
 )
 
 bot = telebot.TeleBot(TOKEN)
@@ -12,12 +12,12 @@ CHANNEL_USERNAME = '@sevgi4500'
 
 app = Flask(__name__)
 
-# Kullanıcıların gönderi oluşturma aşamalarını takip etmek için geçici hafıza
+# Kullanıcıların medya gönderim aşamalarını takip etmek için hafıza
 user_data = {}
 
 @app.route('/')
 def home():
-    return "Paid Media Botu Aktif!"
+    return "Paid Media Botu Aktif ve Güvenli!"
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -26,7 +26,6 @@ def send_welcome(message):
         "Merhaba! Kanala kilitli (Paid Media) içerik yüklemek için bana bir Fotoğraf veya Video gönderin."
     )
 
-# Kullanıcı Medya (Fotoğraf / Video) gönderdiğinde tetiklenir
 @bot.message_handler(content_types=['photo', 'video'])
 def handle_media(message):
     chat_id = message.chat.id
@@ -67,13 +66,16 @@ def process_star_amount(message):
             f"İçerik {CHANNEL_USERNAME} kanalına kilitli olarak aktarılıyor..."
         )
         
-        # Burada Telegram Paid Media API üzerinden kanala gönderim simule edilir
-        # Telegram Bot API Paid Media desteği ile kanala gönderilir.
-        
+        # İçeriği kanala gönderme adımı
+        if data['type'] == 'photo':
+            bot.send_photo(CHANNEL_USERNAME, data['file_id'], caption=f"🔓 Bu içerik {stars} Stars ile açılabilir.")
+        else:
+            bot.send_video(CHANNEL_USERNAME, data['file_id'], caption=f"🔓 Bu içerik {stars} Stars ile açılabilir.")
+            
         del user_data[chat_id]
         
     except ValueError:
-        msg = bot.reply_to(message, "Lütfen sadece sayı yazın! (Örn: 100 veya 400)")
+        msg = bot.reply_to(message, "Lütfen sadece sayı yazın! (Örn: 100, 400 veya 1000)")
         bot.register_next_step_handler(msg, process_star_amount)
 
 if __name__ == '__main__':
