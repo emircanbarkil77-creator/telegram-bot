@@ -1,8 +1,9 @@
 import os
 import telebot
 from flask import Flask
+from telebot.types import InputPaidMediaPhoto, InputPaidMediaVideo
 
-TOKEN = '8876167807:AAHVA48JaVrksZG9rhw1JQJZtB6G7giSB0w'
+TOKEN = os.environ.get('BOT_TOKEN')
 
 bot = telebot.TeleBot(TOKEN)
 CHANNEL_USERNAME = '@sevgi4500'
@@ -63,9 +64,16 @@ def process_star_amount(message):
         )
         
         if data['type'] == 'photo':
-            bot.send_photo(CHANNEL_USERNAME, data['file_id'], caption=f"🔓 Bu içerik {stars} Stars ile açılabilir.")
+            media = [InputPaidMediaPhoto(media=data['file_id'])]
         else:
-            bot.send_video(CHANNEL_USERNAME, data['file_id'], caption=f"🔓 Bu içerik {stars} Stars ile açılabilir.")
+            media = [InputPaidMediaVideo(media=data['file_id'])]
+            
+        bot.send_paid_media(
+            chat_id=CHANNEL_USERNAME,
+            star_count=stars,
+            media=media,
+            caption=f"🔓 Bu içeriği açmak için {stars} Stars ödeyin."
+        )
             
         del user_data[chat_id]
         
