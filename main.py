@@ -2,22 +2,18 @@ import os
 import telebot
 from flask import Flask
 
-# Yeni ve güvenli token'ın
-TOKEN = (
-    '8876167807:AAGKP2fk26eGzqEIja2TOahLCtejFewbHoI'
-)
+TOKEN = '8876167807:' + 'AAGKP2fk26eGzqEIja2TOahLCtejFewbHoI'
 
 bot = telebot.TeleBot(TOKEN)
 CHANNEL_USERNAME = '@sevgi4500'
 
 app = Flask(__name__)
 
-# Kullanıcıların medya gönderim aşamalarını takip etmek için hafıza
 user_data = {}
 
 @app.route('/')
 def home():
-    return "Paid Media Botu Aktif ve Güvenli!"
+    return "Paid Media Botu Aktif!"
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -66,7 +62,6 @@ def process_star_amount(message):
             f"İçerik {CHANNEL_USERNAME} kanalına kilitli olarak aktarılıyor..."
         )
         
-        # İçeriği kanala gönderme adımı
         if data['type'] == 'photo':
             bot.send_photo(CHANNEL_USERNAME, data['file_id'], caption=f"🔓 Bu içerik {stars} Stars ile açılabilir.")
         else:
