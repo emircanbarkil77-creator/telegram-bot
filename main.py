@@ -1,6 +1,6 @@
 import telebot
 
-TOKEN = 8876167807:AAEHfJlHcdY4xWEL-kYTuVzvIm5n82AhHbU
+TOKEN = '8876167807:AAEHfJlHcdY4xWEL-kYTuVzvIm5n82AhHbU
 bot = telebot.TeleBot(TOKEN)
 CHANNEL_USERNAME = '@sevgi4500'
 
