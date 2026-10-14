@@ -1,15 +1,13 @@
 import os
+import requests
 import telebot
 from flask import Flask
-from telebot.types import InputPaidMediaPhoto, InputPaidMediaVideo
 
 TOKEN = os.environ.get('BOT_TOKEN')
-
 bot = telebot.TeleBot(TOKEN)
 CHANNEL_USERNAME = '@sevgi4500'
 
 app = Flask(__name__)
-
 user_data = {}
 
 @app.route('/')
@@ -63,17 +61,23 @@ def process_star_amount(message):
             f"İçerik {CHANNEL_USERNAME} kanalına kilitli olarak aktarılıyor..."
         )
         
-        if data['type'] == 'photo':
-            media = [InputPaidMediaPhoto(media=data['file_id'])]
-        else:
-            media = [InputPaidMediaVideo(media=data['file_id'])]
-            
-        bot.send_paid_media(
-            chat_id=CHANNEL_USERNAME,
-            star_count=stars,
-            media=media,
-            caption=f"🔓 Bu içeriği açmak için {stars} Stars ödeyin."
-        )
+        # Telegram API'ye doğrudan istek atarak kesin kilitli (paid media) gönderiyoruz
+        url = f"https://api.telegram.org/bot{TOKEN}/sendPaidMedia"
+        
+        payload = {
+            "chat_id": CHANNEL_USERNAME,
+            "star_count": stars,
+            "media": [
+                {
+                    "type": data['type'],
+                    "media": data['file_id'],
+                    "caption": f"🔓 Bu içeriği açmak için {stars} Stars ödeyin."
+                }
+            ]
+        }
+        
+        response = requests.post(url, json=payload)
+        print("Telegram API Yanıtı:", response.text)
             
         del user_data[chat_id]
         
